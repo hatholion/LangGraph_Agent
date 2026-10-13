@@ -240,3 +240,77 @@ from common.qdrant import get_qdrant_client
 ```
 
 > `common/`의 코드를 수정한 뒤에는 커널만 재시작하면 되고, `uv sync`를 다시 실행할 필요는 없다 (editable 설치이므로 소스 변경이 즉시 반영된다).
+
+---
+
+## 11. RAG 서비스 사용법 (AI기본법 QA)
+
+설계·구현 문서는 [`3file-system-dev/`](3file-system-dev/)(requirements.md / design.md / tasks.md) 참고.
+
+### 11.1 환경변수
+
+`common/config.py`가 읽는 환경변수(기본값이 있는 항목은 `.env`에 없어도 동작한다):
+
+```text
+LLM_API_KEY / OPENAI_API_KEY   # common/ai_model.py의 현재 구현에 맞게 둘 중 사용 중인 키
+LLM_BASE_URL                   # MonoRouter 등 OpenAI 호환 엔드포인트 사용 시
+LLM_MODEL                      # 기본값: gpt-5.4-mini
+EMBEDDING_MODEL                # 기본값: text-embedding-3-small
+QDRANT_URL                     # 기본값: http://localhost:6333
+QDRANT_COLLECTION              # 기본값: ai_basic_law
+RETRIEVAL_TOP_K                # 기본값: 10
+RERANK_TOP_N                   # 기본값: 4
+CHUNK_MAX_CHARS                # 기본값: 1500
+```
+
+### 11.2 색인(Offline) 실행
+
+Qdrant가 떠 있어야 한다(`cd docker-qdrant && docker compose up -d`). 1회 실행하면 `data/ai_basic_law.hwpx`를 로딩ㆍ구조화ㆍChunking한 뒤 Qdrant에 upsert한다(재실행해도 결정론적 ID라 중복 생성되지 않는다).
+
+```bash
+uv run python -m rag.indexer                          # 기본: data/ai_basic_law.hwpx
+uv run python -m rag.indexer --path data/other.hwpx   # 다른 문서 색인
+```
+
+### 11.3 API 실행 및 호출(Online)
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "고영향 인공지능이란 무엇인가요?"}'
+```
+
+응답 형식:
+
+```json
+{
+  "answer": "...",
+  "sources": [
+    {"article": "제33조", "content": "제33조(고영향 인공지능의 확인)\n..."}
+  ]
+}
+```
+
+`GET /health`로 Qdrant 연결 상태를, `GET /docs`로 FastAPI 자동 문서를 확인할 수 있다.
+
+### 11.4 평가 실행
+
+```bash
+uv run python -m eval.evaluate                # Retrieval + Answer 평가
+uv run python -m eval.evaluate --skip-answers  # Retrieval 지표만(빠름)
+uv run python -m eval.evaluate --top-k 10      # top_k 조정
+```
+
+평가 결과와 Advanced RAG 적용 전/후 비교는 [`eval/results.md`](eval/results.md)에 정리되어 있다.
+
+### 11.5 postgresql 사용하기
+- 1.agentic_rag.ipynb (Agentic RAG 그래프, Hybrid 검색)
+uv add langgraph rank-bm25       
+- 2.short_term_memory.ipynb (수동 구현 — chat_history 테이블)
+uv add psycopg2-binary           
+- 2.short_term_memory.ipynb 6번 섹션 (PostgresSaver)
+uv add langgraph-checkpoint-postgres "psycopg[binary]"  

@@ -134,7 +134,7 @@ def chunk_law_document(paragraphs: list[str], max_chars: int = 1500) -> list[Law
 - Vector size: `common.ai_model.get_embedding_model()`의 모델(`text-embedding-3-small` 기본, 1536차원)에서 1회 probe하여 결정하거나 상수로 고정.
 - Point ID: `uuid.uuid5(NAMESPACE_DNS, chunk.id)` — 재색인 시 upsert로 덮어써 중복 방지.
 - Payload: `LawChunk`의 모든 필드 + `text`.
-- Hybrid Search(§2.4 Phase 0.3 결정에 따라 채택 확정)를 위해 **BM25는 `rank_bm25` 별도 인메모리 인덱스**로 구축한다(Qdrant Named Vectors/sparse vector 재구성은 사용하지 않음 — 구현 단순화).
+- Hybrid Search(§2.4 Phase 0.3 결정에 따라 채택 확정)에 쓰이는 **BM25 인메모리 인덱스(`rank_bm25`)는 `vectorstore.py`가 아니라 `retriever.py`에서 구축한다** — §1.1 단일 책임 원칙상 `vectorstore.py`는 Dense 벡터+Qdrant 저장만 담당하고, BM25는 검색 개선 로직(§5.6이 `retriever.py`로 명시)에 속하기 때문이다(Qdrant Named Vectors/sparse vector 재구성은 쓰지 않음 — 구현 단순화).
 
 ```python
 # rag/vectorstore.py
@@ -164,7 +164,7 @@ def retrieve_dense(query: str, top_k: int = 10) -> list[RetrievedChunk]: ...
 
 | 기법 | 우선순위 | 구현 방식 |
 |---|---|---|
-| Hybrid Search (Dense+BM25) | 1순위(채택) | `retrieve_dense` 결과와 `rank_bm25`(코퍼스: 전체 Chunk 텍스트, 형태소 분리는 공백/간이 토크나이저로 시작) 결과를 각각 순위 리스트로 얻음 |
+| Hybrid Search (Dense+BM25) | 1순위(채택) | `retrieve_dense` 결과와 `rank_bm25`(코퍼스: 전체 Chunk 텍스트) 결과를 각각 순위 리스트로 얻음. 토큰화는 **문자 bigram**으로 확정(실측 근거는 아래 참고) |
 | RRF | 1순위(채택, Hybrid 융합에 필수) | `score(d) = Σ 1 / (k + rank_i(d))`, k=60 기본값 |
 | Metadata Filtering | 2순위(여유 시) | 질문에서 `제N조`, `제N장` 패턴을 정규식으로 추출되면 Qdrant `Filter(must=[FieldCondition(key="article_no", match=MatchValue(value=N))])` 적용 |
 | Multi Query | 3순위(보류) | LLM에 "아래 질문을 의미는 유지하되 표현이 다른 질의 3개로 바꿔줘" 프롬프트 → 각 질의로 `retrieve_dense` 호출 → `chunk.id` 기준 합집합(dedup), 점수는 max 또는 평균 |
@@ -178,6 +178,15 @@ def retrieve(
 ) -> list[RetrievedChunk]:
     """baseline과 advanced 기법을 플래그로 토글 — eval에서 Before/After 비교용"""
 ```
+
+**실측 검증(확정 근거)**: `eval/evaluate.py`의 `compare_retrieval_configs`로 golden_set 25문항 전체를 비교한 결과.
+
+| 토크나이저 | baseline(Dense) | advanced(Hybrid) |
+|---|---|---|
+| 공백 분리 | Hit@5=0.960, MRR=0.873 | Hit@5=0.880, MRR=0.718 (**baseline보다 나쁨**) |
+| 문자 bigram | Hit@5=0.960, MRR=0.873 | Hit@5=0.960, MRR=**0.920**(개선) |
+
+한국어는 조사가 단어에 붙어 공백 토큰화의 term 매칭 정확도가 낮다 — BM25가 노이즈 섞인 순위를 RRF에 섞어 넣어 오히려 Dense 단독보다 품질이 떨어졌다. 형태소 분석기 없이 CJK 텍스트에 흔히 쓰이는 **문자 bigram**으로 바꾸자 Hit@K는 유지되고 MRR이 뚜렷이 개선되어, Phase 0.3에서 Hybrid를 1순위로 채택한 가설(§2.4 상단)이 실제로 입증됐다. `rag/retriever.py`의 `_tokenize()`는 bigram으로 구현되어 있다.
 
 ### 2.5 `rag/reranker.py` — Reranking
 
@@ -290,9 +299,9 @@ def evaluate_answers(
     """answer_keyword_coverage(답변 키워드 포함률), source_grounded_rate(근거 조문 일치율) 반환"""
 
 def compare_retrieval_configs(golden_set: list[GoldenItem], k: int = DEFAULT_TOP_K) -> dict:
-    """baseline(dense only) vs advanced(multi-query + hybrid 동시 적용) 비교.
-    주의: '최종 채택'은 Hybrid 1순위(§2.4)이지만, 이 비교 프리셋은 Multi
-    Query까지 함께 켠 "최대 구성"을 advanced로 두어 상한선을 같이 본다."""
+    """baseline(dense only) vs advanced(hybrid) 비교.
+    Multi Query는 3순위(보류, Phase 5.6 미구현)라 advanced 프리셋에서 제외—
+    Hybrid만이 현재 실제로 채택ㆍ구현된 Advanced RAG 기법이다(§2.4)."""
 
 def main() -> None:
     """CLI: `uv run python -m eval.evaluate [--top-k N] [--skip-answers]`

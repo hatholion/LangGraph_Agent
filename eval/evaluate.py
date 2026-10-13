@@ -119,12 +119,15 @@ def evaluate_answers(
 
 
 def compare_retrieval_configs(golden_set: list[GoldenItem], k: int = DEFAULT_TOP_K) -> dict:
-    """baseline(Dense만)과 advanced(Multi Query + Hybrid) 설정의 Retrieval 지표를 비교한다."""
+    """baseline(Dense만)과 advanced(Hybrid Search) 설정의 Retrieval 지표를 비교한다.
+
+    Multi Query는 3순위(보류, tasks.md Phase 5.6)로 아직 구현되지 않아
+    advanced 프리셋에서 제외한다 — Hybrid가 현재 채택이 확정된 유일한
+    Advanced RAG 기법이다(design.md §2.4).
+    """
     configs: dict[str, Callable[[str, int], list]] = {
         "baseline (dense only)": lambda q, top_k: retriever.retrieve(q, top_k=top_k),
-        "advanced (multi-query + hybrid)": lambda q, top_k: retriever.retrieve(
-            q, top_k=top_k, use_multi_query=True, use_hybrid=True
-        ),
+        "advanced (hybrid)": lambda q, top_k: retriever.retrieve(q, top_k=top_k, use_hybrid=True),
     }
     return {name: evaluate_retrieval(golden_set, fn, k=k) for name, fn in configs.items()}
 
