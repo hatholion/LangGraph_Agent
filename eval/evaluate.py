@@ -52,7 +52,7 @@ def _normalize_article(value: str | int) -> str:
     """'제2조' / 2 / '17의2' 등 서로 다른 조문 표기를 비교 가능한 키로 변환한다."""
     return str(value).replace("제", "").replace("조", "").strip()
 
-
+# 검색된 조문이 기대 조문과 일치하는지로 Hit@K/Recall@K/MRR 계산
 def evaluate_retrieval(
     golden_set: list[GoldenItem],
     retrieve_fn: Callable[[str, int], list],
@@ -85,7 +85,8 @@ def evaluate_retrieval(
         "n": len(golden_set),
     }
 
-
+# 생성된 답변에 기대 키워드가 포함됐는지(answer_keyword_coverage), 
+# sources에 기대 조문이 들어있는지(source_grounded_rate)로 근사 채점
 def evaluate_answers(
     golden_set: list[GoldenItem],
     answer_fn: Callable[[str], object],

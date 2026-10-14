@@ -96,7 +96,7 @@ VS Code에서 `.ipynb`를 사용할 경우 `.venv`의 Python을 Kernel로 선택
 필요하면 Kernel을 등록한다.
 
 ```bash
-uv run python -m ipykernel install --user --name rag-minipjt   --display-name "rag-minipjt"
+uv run python -m ipykernel install --user --name rag-minipjt --display-name "rag-minipjt"
 ```
 
 ---
