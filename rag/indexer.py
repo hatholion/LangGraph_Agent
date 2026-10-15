@@ -1,10 +1,12 @@
+# 문서 chunking 후 embedding 한 뒤 vector db에 저장하는 행위를 indexing이라고 함. 검색을 빠르게 하기 위해서.
+
 import argparse
 
 from rag.loader import load_law_document
 from rag.chunker import chunk_law_document
 from rag.vectorstore import build_vectorstore
 
-DEFAULT_DOCUMENT_PATH = "data/ai_basic_law.hwpx"
+DEFAULT_DOCUMENT_PATH = "../data/ai_basic_law.hwpx"
 
 
 def run_indexing(path: str = DEFAULT_DOCUMENT_PATH) -> int:

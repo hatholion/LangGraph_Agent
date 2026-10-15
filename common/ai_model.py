@@ -12,52 +12,52 @@ from common.config import (
     OPENAI_API_KEY
 )
 
+#def get_llm_model(
+#    model: str = MODEL,
+#    api_key: str = OPENAI_API_KEY,
+#    temperature: float = 0,
+#    max_tokens: int = 512
+#):
+#    return ChatOpenAI(
+#        model=MODEL,
+#        api_key=OPENAI_API_KEY,
+#        temperature=temperature,
+#        max_tokens=max_tokens,
+#    )
+
+
+#def get_embedding_model():
+#   embedding_model = EMBEDDING_MODEL
+#    embeddings = OpenAIEmbeddings(
+#        api_key=OPENAI_API_KEY,
+#        model=embedding_model
+#        )
+#    # print(embeddings)
+#    return embeddings
+
+# mono key로 할 때는 아래처럼 해야 함. (MonoRouter 사용)
+
 def get_llm_model(
     model: str = MODEL,
-    api_key: str = OPENAI_API_KEY,
+    api_key: str = API_KEY,
     temperature: float = 0,
     max_tokens: int = 512
 ):
     return ChatOpenAI(
-        model=MODEL,
-        api_key=OPENAI_API_KEY,
-        temperature=temperature,
-        max_tokens=max_tokens,
+    model=MODEL,
+    api_key=API_KEY,
+    base_url=BASE_URL,
+    temperature=temperature,
+    use_responses_api=False,  # base url로 할 때는 이부분 넣어야 함.(MonoRouter 사용)
+    max_tokens=max_tokens,
     )
 
 
 def get_embedding_model():
     embedding_model = EMBEDDING_MODEL
     embeddings = OpenAIEmbeddings(
-        api_key=OPENAI_API_KEY,
+        api_key=API_KEY,
+        base_url=BASE_URL,
         model=embedding_model
-        )
-    # print(embeddings)
+    )     # print(embeddings)
     return embeddings
-
-# mono key로 할 때는 아래처럼 해야 함. (MonoRouter 사용)
-# def get_llm_model(
-#     model: str = MODEL,
-#     api_key: str = API_KEY,
-#     temperature: float = 0,
-#     max_tokens: int = 512
-# ):
-#     return ChatOpenAI(
-#         model=MODEL,
-#         api_key=API_KEY,
-#         base_url=BASE_URL,
-#         temperature=temperature,
-#         use_responses_api=False,  # base url로 할 때는 이부분 넣어야 함.(MonoRouter 사용)
-#         max_tokens=max_tokens,
-#     )
-
-
-# def get_embedding_model():
-#     embedding_model = EMBEDDING_MODEL
-#     embeddings = OpenAIEmbeddings(
-#         api_key=API_KEY,
-#         base_url=BASE_URL,
-#         model=embedding_model
-#         )
-#     # print(embeddings)
-#     return embeddings
